@@ -1,3 +1,6 @@
+import sendRequest from './api.js';
+
+
 var fR = new FileReader();
 const playerContainer = document.getElementById("all-players-container");
 const newPlayerFormContainer = document.getElementById("new-player-form");
@@ -27,30 +30,6 @@ const REVERSE_ENUM = Object.freeze({
   FALSE: false,
 });
 
-const validatedURL = (api_param, id_param) => {
-  const validatedId = (id_param) => {
-    const idPattern = new RegExp(/^\d{2}\d+$/);
-    if (idPattern.test(String(id_param))) {
-      return String(id_param);
-    } else {
-      throw new Error("Invalid ID");
-    }
-  };
-  return id_param === "" ? api_param : api_param + "/" + validatedId(id_param);
-};
-
-const sendRequest = async (api, id = "", options = {}) => {
-  try {
-    const resp = await fetch(validatedURL(api, id), options);
-    console.log(resp);
-    const data = await resp.json();
-    console.log(data);
-    return data;
-  } catch (err) {
-    console.error(err);
-    throw new Error("Failed to fetch data");
-  }
-};
 const updateRoster = async () => {
   const playersData = await sendRequest(PLAYERURL, "", { method: "GET" });
   playerRoster = playersData.data.players;
@@ -62,6 +41,7 @@ const getRoster = () => {
 const checkRoster = async (id) => {
   if (playerRoster.some((el) => el.id === id)) return true;
   const req = await sendRequest(PLAYERURL, id);
+  console.log(req.success);
   return await req.success;
 };
 const getPlayer = async (id) => {
@@ -86,18 +66,18 @@ const addNewTeam = async(...data) => {
 
 const addNewPlayer = async (data) => {
   console.log("Adding player");
-  console.log(data);
-  if (!(await checkRoster(data.id))) {
-    data.updatedAt = new Date().toISOString();
-    const req = await sendRequest(PLAYERURL, "", {
+  data.updatedAt = new Date().toISOString();
+
+    let option =  {
       method: "POST", // or 'PUT'
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
-    });
+    };
+    console.log(option);
+    const req = await sendRequest(PLAYERURL, "",option);
     console.log(req);
-  }
 };
 const update = (players) => {
   playerContainer.innerHTML = "";
@@ -203,7 +183,13 @@ const renderCard = (player) => {
 const renderAllPlayers = (playerList) => {
   try {
     playerList.forEach((player) => {
-      playerContainer.append(renderCard(player));
+      const playerCard = renderCard(player)
+
+      playerCard.addEventListener('click', (e)=>{
+        updateDetailPane(player);
+      });
+
+      playerContainer.append(playerCard);
     });
   } catch (err) {
     console.error("Uh oh, trouble rendering players!", err);
@@ -218,7 +204,7 @@ const renderNewPlayerForm = () => {
       'input[type="submit"]'
     );
     const inputFile = document.querySelector("input[type=file]");
-    const avatar = document.querySelector('img[src=""]');
+    const avatar = document.getElementById('preview-avatar');
 
     console.log("Submit");
     console.log(buttonSubmit);
@@ -248,19 +234,17 @@ const renderNewPlayerForm = () => {
       const inputStatus = formEl[2].value;
       const inputTeam = formEl[3].value;
       const fileImg = avatar.src;
-      const ttp2 = generateCutePoopies(
-        9000,
-        inputName,
-        inputBreed,
-        inputStatus,
-        fileImg,
-        new Date().toISOString(),
-        "",
-        inputTeam,
-        COHORT_ID
-      );
-      await addNewPlayer(ttp2);
-      update();
+      const puppy = {
+        name:inputName,
+        breed:inputBreed,
+        status:inputStatus,
+        imageUrl:fileImg,
+        teamId:inputTeam
+      };
+      addNewPlayer(puppy);
+      await updateRoster();
+      const updatedRoster = getRoster(); 
+      update(updatedRoster);
     });
   } catch (err) {
     console.error("Uh oh, trouble rendering the new player form!", err);
@@ -304,27 +288,108 @@ const filterBy = (players, value, option = KEY_ENUM.NONE) => {
   return filteredRoster;
 };
 
-const ttp1 = {id:6811,name:"TestTubePoopies#1",breed:"Pomsky",status:"field",imageUrl:"https://i0.wp.com/petradioshow.com/wp-content/uploads/2020/02/mya2.jpg?resize=396%2C484&ssl=1",createdAt:"2023-06-03T04:17:02.720Z",updatedAt:"2023-06-03T04:17:02.720Z",teamId:420,cohortId:221};
-const ttp2 = {id:6811,name:"TestTubePoopies#2",breed:"Pomsky",status:"field",imageUrl:"https://metro.co.uk/wp-content/uploads/2016/06/pomsky-fox.jpg?quality=90&strip=all",createdAt:"2023-06-03T04:17:02.720Z",updatedAt:"2023-06-03T04:17:02.720Z",teamId:420,cohortId:221};
-const img1 = "https://i0.wp.com/petradioshow.com/wp-content/uploads/2020/02/mya2.jpg?resize=396%2C484&ssl=1";
+
+const updateDetailPane = (player) => {
+  console.log("Player clicked");
+  console.log(player);
+  const getDetails = () => {}
+  const contentList = document.getElementById('player-detail-list').children;
+  contentList[KEY_ENUM.ID].innerHTML="ID: "+player.id;
+  contentList[KEY_ENUM.NAME].innerHTML="Name: "+player.name;
+  contentList[KEY_ENUM.BREED].innerHTML="Breed: "+player.breed;
+  contentList[KEY_ENUM.STATUS].innerHTML="Status: "+player.status;
+  contentList[KEY_ENUM.CREATE-1].innerHTML="Created on: "+player.createdAt;
+  contentList[KEY_ENUM.UPDATE-1].innerHTML="Last updated: "+player.updatedAt;
+  contentList[KEY_ENUM.TEAM-1].innerHTML="Team #: "+player.teamId;
+  contentList[KEY_ENUM.COHORT-1].innerHTML="Cohort #: "+player.cohortId;
+  const avatar = document.getElementById('pane-avatar');
+  const imgData = player.imageUrl;
+  console.log(imgData);
+  avatar.src = imgData;
+}
+
+//const ttp1 = {id:6811,name:"TestTubePoopies#1",breed:"Pomsky",status:"field",imageUrl:"https://i0.wp.com/petradioshow.com/wp-content/uploads/2020/02/mya2.jpg?resize=396%2C484&ssl=1",createdAt:"2023-06-03T04:17:02.720Z",updatedAt:"2023-06-03T04:17:02.720Z",teamId:420,cohortId:221};
+//const ttp2 = {id:6811,name:"TestTubePoopies#2",breed:"Pomsky",status:"field",imageUrl:"https://metro.co.uk/wp-content/uploads/2016/06/pomsky-fox.jpg?quality=90&strip=all",createdAt:"2023-06-03T04:17:02.720Z",updatedAt:"2023-06-03T04:17:02.720Z",teamId:420,cohortId:221};
+//const img1 = "https://i0.wp.com/petradioshow.com/wp-content/uploads/2020/02/mya2.jpg?resize=396%2C484&ssl=1";
 await updateRoster();
 const init = async () => {
-
- // for(let i=0; i<10; i++){
-   // let poopy = generateCutePoopies(9000,`TestTubePoopies#${i+3}`,"pomsky","field",img1,new Date().toISOString(),'',TEAM_ID,COHORT_ID);
-   // await addNewPlayer(poopy);
- // }
-
   generateSelectSort();
   generateSelectFilter();
   const players = getRoster();
+  //const ttpClones = (players.length +10);
+  //for(let i=players.length; i<ttpClones; i++){
+  // let poopy = generateCutePoopies(9000,`TestTubePoopies#${i+3}`,"pomsky","field",img1,new Date().toISOString(),'',TEAM_ID,COHORT_ID);
+  // await addNewPlayer(poopy);
+  //}
+
   renderAllPlayers(players);
   renderNewPlayerForm();
   deleteButton.addEventListener('click', async (e) => {
     e.preventDefault();
     const playerID = e.target.previousSibling.previousSibling.value;
     deletePlayer(playerID);
-})};
+  });
+
+    
+  const carouselButtonRt = document.getElementsByClassName('carousel-btn-rt')[0];
+  const carouselButtonLt = document.getElementsByClassName('carousel-btn-lft')[0];
+  const carouselContainer= document.getElementsByClassName('carousel-container')
+  const styleCContainer = getComputedStyle(document.body);
+  const eWContainer = parseFloat(styleCContainer.width);
+                    +parseFloat(styleCContainer.marginLeft);
+                    +parseFloat(styleCContainer.marginRight);
+                    -parseFloat(styleCContainer.gap)
+  const playerCards = playerContainer.children
+  const cardStyle = getComputedStyle(playerCards[0])
+  const eWCard = parseFloat(cardStyle.width)
+                  +parseFloat(cardStyle.marginLeft)
+                  +parseFloat(cardStyle.marginRight)
+                  
+  const numActiveCards = eWContainer/eWCard;
+  const w1 = playerCards[0].offsetLeft+playerCards[0].offsetWidth;
+  const w2 = playerCards[1].offsetLeft
+  const gapWidth = w2-w1;    
+  const cumulativeGapW = gapWidth*(numActiveCards-1);
+  const postContainerWidth = eWContainer-cumulativeGapW-(carouselButtonLt.offsetWidth*2)
+  const postActiveCards = Math.floor(postContainerWidth/eWCard);
+  let x1 = 0;
+  let x2 = postActiveCards;   
+  console.log('Elements:');
+  console.log(carouselButtonRt);
+  console.log(carouselButtonLt);
+  console.log(carouselContainer);
+  console.log(styleCContainer);
+  console.log(eWContainer);
+  console.log(playerCards);
+  console.log(cardStyle);
+  console.log(eWCard);
+  console.log('Calc:');
+  console.log(gapWidth);
+  console.log(cumulativeGapW);
+  console.log("pre Number of displayable cards: " + numActiveCards);
+  console.log(postActiveCards);
+
+  const updateCarousel = (x1,x2) => {
+    const activeCards = [...getRoster()].slice(x1,x2);
+    update(activeCards);
+  }
+
+  carouselButtonLt.addEventListener('click', ()=>{
+    if(x1>0){
+    x1--;
+    x2--;
+    updateCarousel(x1,x2);
+    }
+  })
+  carouselButtonRt.addEventListener('click', ()=>{
+    if(x2<getRoster().length){
+    x1++;
+    x2++;
+    updateCarousel(x1,x2);
+    }
+  })
+
+};
 const generateSelectSort = () => {
   const selectMenu = document.createElement("select");
   selectMenu.classList.add("select-sort,options-sort");
@@ -415,7 +480,15 @@ const generatePlayerForm = () => {
       <td><input type="text" name="team-id"></td>
     </tr>
     <tr>
-      <td>Choose a profile picture:<img src="" height="200" alt="Image preview" /></td>
+      <td>Age:*Must be under age limit</td>
+      <td><input type="text" name="age-limit"></td>
+    </tr>
+    <tr>
+      <td>Vaccinations upto date:</td>
+      <td><input type="checkbox" name="vaccinated"></td>
+    </tr>
+    <tr>
+      <td>Choose a profile picture:<img src="" id="preview-avatar" height="200" alt="Image preview" /></td>
     </tr>
     <tr>
       <td>*supported ext: .jpeg .png</td>
